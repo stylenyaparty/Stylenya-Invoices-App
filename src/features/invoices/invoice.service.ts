@@ -164,8 +164,21 @@ export const invoiceService = {
     })
 
     await withTransaction(async (db) => {
-      await invoiceRepository.createInvoice(invoice, db)
-      await invoiceRepository.insertLines(lines, db)
+      try {
+        await invoiceRepository.createInvoice(invoice, db)
+        await invoiceRepository.insertLines(lines, db)
+      } catch (err) {
+        if (
+          err &&
+          typeof err === 'object' &&
+          'message' in err &&
+          typeof (err as any).message === 'string' &&
+          (err as any).message.includes('database is locked')
+        ) {
+          throw new Error('La base de datos está ocupada. Intenta nuevamente.');
+        }
+        throw err;
+      }
     })
 
     return mapInvoice(invoice, lines)
@@ -251,58 +264,71 @@ export const invoiceService = {
 
   async approveInvoice(id: string): Promise<Invoice> {
     return withTransaction(async (db) => {
-      const invoice = await invoiceRepository.getInvoiceById(id, db)
-      if (!invoice) {
-        throw new Error(`Invoice ${id} not found`)
+      try {
+        const invoice = await invoiceRepository.getInvoiceById(id, db)
+        if (!invoice) {
+          throw new Error(`Invoice ${id} not found`)
+        }
+        ensureDraft(invoice);
+
+        const lines = await invoiceRepository.getInvoiceLines(id, db);
+        const totals = calcInvoiceTotals({
+          lines: lines.map((line) => ({
+            qty: line.qty,
+            unitPrice: line.unitPrice,
+            isTaxable: line.isTaxable === 1,
+            title: line.title,
+            id: line.id,
+          })),
+          fulfillmentMethod: invoice.fulfillmentMethod as FulfillmentMethod,
+          shippingFee: invoice.shippingFee,
+          discountAmount: invoice.discountAmount,
+          taxRate: invoice.taxRate,
+          shippingTaxable: invoice.shippingTaxable === 1,
+        });
+
+        const invoiceNumber = await settingsService.getNextInvoiceNumberAndIncrement(db);
+        const timestamp = nowIso();
+
+        await invoiceRepository.markApproved(
+          id,
+          {
+            invoiceNumber,
+            approvedAt: timestamp,
+            updatedAt: timestamp,
+            taxableItemsSubtotalSnap: totals.taxableItemsSubtotal,
+            nonTaxableItemsSubtotalSnap: totals.nonTaxableItemsSubtotal,
+            itemsSubtotalSnap: totals.itemsSubtotal,
+            discountAppliedToItemsSnap: totals.discountAppliedToItems,
+            taxableItemsAfterDiscountSnap: totals.taxableItemsAfterDiscount,
+            taxBaseSnap: totals.taxBase,
+            taxAmountSnap: totals.taxAmount,
+            netItemsSalesSnap: totals.netItemsSales,
+            shippingRevenueSnap: totals.shippingRevenue,
+            totalSnap: totals.total,
+          },
+          db,
+        );
+
+        const updated = await invoiceRepository.getInvoiceById(id, db);
+        if (!updated) {
+          throw new Error(`Invoice ${id} missing after approval`);
+        }
+
+        return mapInvoice(updated, lines);
+      } catch (err) {
+        if (
+          err &&
+          typeof err === 'object' &&
+          'message' in err &&
+          typeof (err as any).message === 'string' &&
+          (err as any).message.includes('database is locked')
+        ) {
+          throw new Error('La base de datos está ocupada. Intenta nuevamente.');
+        }
+        throw err;
       }
-      ensureDraft(invoice)
-
-      const lines = await invoiceRepository.getInvoiceLines(id, db)
-      const totals = calcInvoiceTotals({
-        lines: lines.map((line) => ({
-          qty: line.qty,
-          unitPrice: line.unitPrice,
-          isTaxable: line.isTaxable === 1,
-          title: line.title,
-          id: line.id,
-        })),
-        fulfillmentMethod: invoice.fulfillmentMethod as FulfillmentMethod,
-        shippingFee: invoice.shippingFee,
-        discountAmount: invoice.discountAmount,
-        taxRate: invoice.taxRate,
-        shippingTaxable: invoice.shippingTaxable === 1,
-      })
-
-      const invoiceNumber = await settingsService.getNextInvoiceNumberAndIncrement(db)
-      const timestamp = nowIso()
-
-      await invoiceRepository.markApproved(
-        id,
-        {
-          invoiceNumber,
-          approvedAt: timestamp,
-          updatedAt: timestamp,
-          taxableItemsSubtotalSnap: totals.taxableItemsSubtotal,
-          nonTaxableItemsSubtotalSnap: totals.nonTaxableItemsSubtotal,
-          itemsSubtotalSnap: totals.itemsSubtotal,
-          discountAppliedToItemsSnap: totals.discountAppliedToItems,
-          taxableItemsAfterDiscountSnap: totals.taxableItemsAfterDiscount,
-          taxBaseSnap: totals.taxBase,
-          taxAmountSnap: totals.taxAmount,
-          netItemsSalesSnap: totals.netItemsSales,
-          shippingRevenueSnap: totals.shippingRevenue,
-          totalSnap: totals.total,
-        },
-        db,
-      )
-
-      const updated = await invoiceRepository.getInvoiceById(id, db)
-      if (!updated) {
-        throw new Error(`Invoice ${id} missing after approval`)
-      }
-
-      return mapInvoice(updated, lines)
-    })
+    });
   },
 
   async markInvoicePaid(

@@ -106,7 +106,7 @@ export const InvoiceDetail = ({ invoiceId, onBack }: InvoiceDetailProps) => {
       setError(String(saveError))
       return false
     } finally {
-      setSaving(false)
+      setTimeout(() => setSaving(false), 2000); // Delay de 2 segundos
     }
   }
 
@@ -268,6 +268,7 @@ export const InvoiceDetail = ({ invoiceId, onBack }: InvoiceDetailProps) => {
                             onChange={(event) => updateLine(index, 'title', event.target.value)}
                             required
                             value={line.title}
+                            placeholder="Enter item title"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -279,6 +280,8 @@ export const InvoiceDetail = ({ invoiceId, onBack }: InvoiceDetailProps) => {
                             step="1"
                             type="number"
                             value={line.qty}
+                            placeholder="Enter quantity"
+                            title="Quantity"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -290,6 +293,8 @@ export const InvoiceDetail = ({ invoiceId, onBack }: InvoiceDetailProps) => {
                             step="0.01"
                             type="number"
                             value={line.unitPrice}
+                            placeholder="Enter unit price"
+                            title="Unit Price"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -298,6 +303,8 @@ export const InvoiceDetail = ({ invoiceId, onBack }: InvoiceDetailProps) => {
                             className="h-4 w-4"
                             onChange={(event) => updateLine(index, 'isTaxable', event.target.checked)}
                             type="checkbox"
+                            placeholder="Taxable"
+                            title="Taxable"
                           />
                         </td>
                       </tr>
