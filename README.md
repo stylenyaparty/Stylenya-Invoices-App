@@ -71,3 +71,11 @@ export default defineConfig([
   },
 ])
 ```
+
+## Testing
+
+This project includes `vitest` for running tests. You can run tests using the command:
+
+```bash
+npm run test
+```
