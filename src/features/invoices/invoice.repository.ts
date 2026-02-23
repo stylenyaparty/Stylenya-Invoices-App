@@ -141,7 +141,7 @@ export const invoiceRepository = {
     const rows = await conn.select<Record<string, unknown>>(
       'SELECT * FROM invoices ORDER BY createdAt DESC',
     )
-    return rows.map(toInvoiceRecord)
+    return (Array.isArray(rows) ? rows : []).map(toInvoiceRecord)
   },
 
   async getInvoiceById(id: string, db?: Database): Promise<InvoiceRecord | null> {
@@ -150,7 +150,7 @@ export const invoiceRepository = {
       'SELECT * FROM invoices WHERE id = ? LIMIT 1',
       [id],
     )
-    return rows[0] ? toInvoiceRecord(rows[0]) : null
+    return rows[0] && typeof rows[0] === 'object' ? toInvoiceRecord(rows[0] as Record<string, unknown>) : null
   },
 
   async getInvoiceLines(invoiceId: string, db?: Database): Promise<InvoiceLineRecord[]> {
@@ -159,7 +159,7 @@ export const invoiceRepository = {
       'SELECT * FROM invoice_lines WHERE invoiceId = ? ORDER BY createdAt ASC',
       [invoiceId],
     )
-    return rows.map(toInvoiceLineRecord)
+    return (Array.isArray(rows) ? rows : []).map(toInvoiceLineRecord)
   },
 
   async replaceLines(invoiceId: string, lines: InvoiceLineRecord[], db?: Database) {

@@ -8,11 +8,12 @@ import {
 import { assertNonNegative } from '../../shared/domain/money'
 import { withTransaction } from '../../shared/db'
 import { settingsService } from '../settings/settings.service'
-import {
+import type {
   InvoiceLineRecord,
   InvoiceRecord,
-  invoiceRepository,
 } from './invoice.repository'
+import { invoiceRepository } from './invoice.repository'
+import type { InvoiceCalcInput } from '../../shared/domain/types'
 
 export interface InvoiceLine {
   id: string

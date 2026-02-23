@@ -1,6 +1,6 @@
 import { FulfillmentMethod } from './enums'
 import { assertNonNegative, round2 } from './money'
-import {
+import type {
   InvoiceCalcInput,
   InvoiceLineInput,
   InvoiceTotals,
