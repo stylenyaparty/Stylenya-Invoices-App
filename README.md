@@ -71,3 +71,13 @@ export default defineConfig([
   },
 ])
 ```
+
+## Testing
+
+This project includes [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) for component testing and [Vitest](https://vitest.dev/) for unit testing. 
+
+To run tests, use the command:
+
+```bash
+npm test
+```
