@@ -79,3 +79,7 @@ This project includes `vitest` for running tests. You can run tests using the co
 ```bash
 npm run test
 ```
+
+## Tauri Setup
+
+This project utilizes Tauri for building desktop applications. Ensure you have the necessary Tauri dependencies installed. The project now includes the `@tauri-apps/plugin-sql` plugin for database interactions. This requires enabling the `sql:default` capability in your `src-tauri/capabilities/default.json` file and adding the plugin to your `src-tauri/Cargo.toml` and `src-tauri/src/lib.rs`.
