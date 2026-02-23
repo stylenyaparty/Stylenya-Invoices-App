@@ -13,6 +13,20 @@ export interface AppSettings {
   updatedAt: string
 }
 
+export interface PrimaryJurisdiction {
+  id: string
+  state: string
+  county: string
+  defaultTaxRate: number
+  isPrimary: boolean
+  createdAt: string
+}
+
+export interface SettingsView {
+  settings: AppSettings
+  primaryJurisdiction: PrimaryJurisdiction | null
+}
+
 const nowIso = () => new Date().toISOString()
 
 const toDomain = (settings: Awaited<ReturnType<typeof settingsRepository.getSettings>>): AppSettings => ({
@@ -20,10 +34,35 @@ const toDomain = (settings: Awaited<ReturnType<typeof settingsRepository.getSett
   shippingTaxable: settings.shippingTaxable === 1,
 })
 
+const toJurisdictionDomain = (
+  jurisdiction: Awaited<ReturnType<typeof settingsRepository.getPrimaryJurisdiction>>,
+): PrimaryJurisdiction | null => {
+  if (!jurisdiction) {
+    return null
+  }
+
+  return {
+    ...jurisdiction,
+    isPrimary: jurisdiction.isPrimary === 1,
+  }
+}
+
 export const settingsService = {
   async getOrCreateSettings(): Promise<AppSettings> {
     const settings = await settingsRepository.getSettings()
     return toDomain(settings)
+  },
+
+  async getSettingsView(): Promise<SettingsView> {
+    const [settings, primaryJurisdiction] = await Promise.all([
+      settingsRepository.getSettings(),
+      settingsRepository.getPrimaryJurisdiction(),
+    ])
+
+    return {
+      settings: toDomain(settings),
+      primaryJurisdiction: toJurisdictionDomain(primaryJurisdiction),
+    }
   },
 
   async updateInvoicePrefix(prefix: string): Promise<AppSettings> {
@@ -36,6 +75,46 @@ export const settingsService = {
     await settingsRepository.updateInvoicePrefix(normalized, updatedAt)
 
     return this.getOrCreateSettings()
+  },
+
+  async saveSettings(input: {
+    invoicePrefix: string
+    shippingTaxable: boolean
+    state: string
+    county: string
+    defaultTaxRate: number
+  }): Promise<SettingsView> {
+    const invoicePrefix = input.invoicePrefix.trim().toUpperCase()
+    const state = input.state.trim()
+    const county = input.county.trim()
+
+    if (!invoicePrefix) {
+      throw new Error('Invoice prefix is required')
+    }
+    if (!state) {
+      throw new Error('State is required')
+    }
+    if (!county) {
+      throw new Error('County is required')
+    }
+    if (input.defaultTaxRate < 0) {
+      throw new Error('Tax rate must be non-negative')
+    }
+
+    await withTransaction(async (db) => {
+      const updatedAt = nowIso()
+      await settingsRepository.updateInvoicePrefix(invoicePrefix, updatedAt, db)
+      await settingsRepository.updateShippingTaxable(input.shippingTaxable ? 1 : 0, updatedAt, db)
+
+      const jurisdiction = await settingsRepository.upsertPrimaryJurisdiction(
+        { state, county, defaultTaxRate: input.defaultTaxRate },
+        db,
+      )
+
+      await settingsRepository.setPrimaryJurisdictionId(jurisdiction?.id ?? null, updatedAt, db)
+    })
+
+    return this.getSettingsView()
   },
 
   async getNextInvoiceNumberAndIncrement(db?: Database): Promise<string> {
