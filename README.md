@@ -79,3 +79,7 @@ This project includes `vitest` for running tests. You can run tests using the co
 ```bash
 npm run test
 ```
+
+## Application Structure
+
+This project has been refactored to include a navigation bar, invoice list, invoice detail view, and settings page. The application now navigates between these views.
